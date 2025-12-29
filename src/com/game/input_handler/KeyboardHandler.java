@@ -22,15 +22,21 @@ public class KeyboardHandler implements KeyListener {
     public void keyPressed(KeyEvent e) {
         int key = e.getKeyCode();
         switch (key) {
-            case KeyEvent.VK_UP -> gameWorld.up();
-            case KeyEvent.VK_DOWN -> gameWorld.down();
-            case KeyEvent.VK_LEFT -> gameWorld.left();
-            case KeyEvent.VK_RIGHT -> gameWorld.right();
+            case KeyEvent.VK_UP -> gameWorld.getPlayer().setUp(true);
+            case KeyEvent.VK_DOWN -> gameWorld.getPlayer().setDown(true);
+            case KeyEvent.VK_LEFT -> gameWorld.getPlayer().setLeft(true);
+            case KeyEvent.VK_RIGHT -> gameWorld.getPlayer().setRight(true);
         }
     }
 
     @Override
     public void keyReleased(KeyEvent e) {
-
+        int key = e.getKeyCode();
+        switch (key) {
+            case KeyEvent.VK_UP -> gameWorld.getPlayer().setUp(false);
+            case KeyEvent.VK_DOWN -> gameWorld.getPlayer().setDown(false);
+            case KeyEvent.VK_LEFT -> gameWorld.getPlayer().setLeft(false);
+            case KeyEvent.VK_RIGHT -> gameWorld.getPlayer().setRight(false);
+        }
     }
 }
