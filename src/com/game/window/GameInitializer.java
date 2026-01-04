@@ -59,3 +59,9 @@ public class GameInitializer {
         gameLoop.start();
     }
 }
+
+/**
+ * 1. Create Project - Add Screens, Simple Game Loop with Simple Block Movement
+ * 2. Add Player Class, Movements and Animation
+ * 3.
+ */

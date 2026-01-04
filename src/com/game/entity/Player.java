@@ -1,140 +1,199 @@
 package com.game.entity;
 
-import com.game.asset_helper.ActionStore;
-import com.game.asset_helper.AnimationStore;
 import com.game.asset_helper.SpriteLoader;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
 
+import static com.game.asset_helper.ActionStore.PlayerAction;
+import static com.game.constants.GameConstant.GAME_HEIGHT;
+import static com.game.constants.GameConstant.GAME_WIDTH;
+
+/**
+ * Player entity with sprite animation, movement, and death states.
+ * Handles input, animation timing, and screen bounds.
+ */
 public class Player implements Character {
 
+    private final float width, height; // Sprite dimensions
+    private final float scale = 2.0f;  // Render scale
+    // Dependencies
+    private final SpriteLoader spriteLoader;
+    private final Color color;
+    // Core properties
+    private float x, y;                // World position
+    private float movementSpeed = 200f; // Pixels/second
+    // Input state
+    private boolean isLeft, isRight, isUp, isDown;
+    private boolean isMoving;
+    private boolean isFacingLeft;
+    // Animation state
+    private PlayerAction playerAction = PlayerAction.IDLE_RIGHT;
+    private int animationIndex = 0;
+    private float animationTimer = 0f;
+    // Game state
+    private boolean isDead = false;
+    private boolean isFinallyDead = false;
+
     /**
-     * ===== PLAYER STATE VARIABLES =====
-     */
-    int animationCount = 0;  // Frame counter for sprite animation (0-40)
-    int i = 0;               // Current sprite frame index (0-3 for 4-frame animation)
-
-    private Color color = Color.RED;              // Fallback color (when no sprite)
-    private float x, y, width, height;            // Position + size (float = smooth movement)
-    private float movementSpeed = 100;            // Pixels per SECOND (frame-rate independent)
-
-    // ===== INPUT STATE - Which directions pressed? =====
-    private boolean isLeft, isRight, isUp, isDown;  // True when key held down
-
-    private boolean isMoving = false;              // Currently moving? (unused currently)
-    private boolean isFacingLeft = true;           // Which way player faces (for flipping)
-    private boolean isDead = false;                // Game over state
-
-    private float scale = 2.0f;                    // Sprite size multiplier (2x bigger)
-    private SpriteLoader spriteLoader;             // Loads sprite sheets/animations
-
-    /**
-     * ===== CONSTRUCTOR - Create Player =====
-     * Sets starting position + size + sprite loader reference
+     * Creates player at position with sprite loader.
      */
     public Player(float x, float y, float width, float height, SpriteLoader spriteLoader) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
         this.spriteLoader = spriteLoader;
-        this.color = Color.RED;
-        this.x = x;        // Starting X position
-        this.y = y;        // Starting Y position
-        this.width = width; // Base width (before scaling)
-        this.height = height; // Base height (before scaling)
+        this.color = Color.WHITE;
+        this.animationIndex = 0;
+        this.animationTimer = 0f;
     }
 
     /**
-     * ===== RENDER - Draw Player (60fps) =====
-     * Called by GameWorld.render() → Draws sprite + animation
-     * <p>
-     * DRAWING LAYERS:
-     * 1. Red rectangle (fallback/debug)
-     * 2. Animated sprite ON TOP (IDLE_LEFT animation)
+     * Renders player sprite with current animation frame.
      */
     @Override
     public void render(Graphics g) {
-        // 🟥 LAYER 1: DEBUG RECTANGLE (always draws behind sprite)
-        g.setColor(color);
-        g.fillRect((int) x, (int) y, (int) width, (int) height);
+        if (isFinallyDead) return;
 
-        // 🖼️ LAYER 2: ANIMATED SPRITE (main visual)
-        // Gets 4-frame IDLE_LEFT animation array from sprite sheet
-        BufferedImage[] image = spriteLoader.getPlayerSprite(ActionStore.PlayerAction.IDLE_LEFT);
-        // Draws current frame 'i' at 2x scale
-        g.drawImage(image[i], (int) x, (int) y, (int) (width * scale), (int) (height * scale), null);
-
-        // ===== ANIMATION LOGIC (40 frames per cycle) =====
-        // Counts frames → Switches sprite every 40 frames (~0.67s per cycle at 60fps)
-        if (animationCount > 40) {
-            if (i > 3) {  // End of 4-frame animation (0,1,2,3)
-                i = 0;    // Loop back to first frame
-            } else {
-                i++;      // Next frame
-            }
-            animationCount = 0;  // Reset counter
-        } else {
-            animationCount++;    // Increment frame counter
-        }
+        // Draw animated sprite (safely clamped index)
+        BufferedImage[] frames = spriteLoader.getPlayerSprite(playerAction);
+        int safeIndex = Math.max(0, Math.min(animationIndex, frames.length - 1));
+        g.drawImage(
+                frames[safeIndex],
+                (int) x, (int) y,
+                (int) (width * scale), (int) (height * scale),
+                null
+        );
     }
 
     /**
-     * ===== UPDATE - Game Logic (60fps) =====
-     * Called by GameWorld.update() → Handles movement + physics
+     * Updates movement, action state, and animation each frame.
      */
     @Override
     public void update(float deltaTime) {
-        move(deltaTime);  // Apply movement based on input state
+        updatePlayerAction();
+
+        if (isDead) {
+            animatePlayer(deltaTime);
+            return;
+        }
+        move(deltaTime);
+        animatePlayer(deltaTime);
+
     }
 
     /**
-     * ===== MOVEMENT SYSTEM - Frame-rate Independent =====
-     * <p>
-     * CORE FORMULA: distance = speed × time
-     * movementSpeed (100) × deltaTime (0.016s) = ~1.6px per frame
-     * <p>
-     * DIAGONAL FIX NEEDED: Currently no normalization → Diagonal = √2× faster!
-     * TODO: Use vector normalization for perfect 45° movement
+     * Updates movement based on input flags.
      */
-    public void move(float deltaTime) {
-        // ↔️ HORIZONTAL MOVEMENT (Left/Right priority: Left wins)
+    private void move(float deltaTime) {
+        isMoving = false;
+
+        // Apply movement (horizontal first)
         if (isLeft && !isRight) {
-            x -= movementSpeed * deltaTime;  // Move LEFT
+            x -= movementSpeed * deltaTime;
+            isFacingLeft = true;
+            isMoving = true;
         } else if (isRight && !isLeft) {
-            x += movementSpeed * deltaTime;  // Move RIGHT
+            x += movementSpeed * deltaTime;
+            isFacingLeft = false;
+            isMoving = true;
         }
 
-        // ↕️ VERTICAL MOVEMENT (Up/Down priority: Up wins)
+        // Vertical movement
         if (isUp && !isDown) {
-            y -= movementSpeed * deltaTime;  // Move UP (Y=0 is TOP)
+            y -= movementSpeed * deltaTime;
+            isMoving = true;
         } else if (isDown && !isUp) {
-            y += movementSpeed * deltaTime;  // Move DOWN
+            y += movementSpeed * deltaTime;
+            isMoving = true;
+        }
+
+        keepInBounds();
+    }
+
+    /**
+     * Updates current animation action based on input.
+     */
+    private void updatePlayerAction() {
+        if (isDead) {
+            changePlayerAction(PlayerAction.DIE);
+            return;
+        }
+
+        if (isDown) {
+            changePlayerAction(PlayerAction.WALK_DOWN);
+        } else if (isUp) {
+            changePlayerAction(PlayerAction.WALK_UP);
+        } else if (isLeft) {
+            changePlayerAction(PlayerAction.WALK_LEFT);
+        } else if (isRight) {
+            changePlayerAction(PlayerAction.WALK_RIGHT);
+        } else {
+            // Idle facing current direction
+            playerAction = isFacingLeft ? PlayerAction.IDLE_LEFT : PlayerAction.IDLE_RIGHT;
         }
     }
 
     /**
-     * ===== INPUT SETTERS - Called by KeyboardHandler (60fps) =====
-     * Set movement flags when keys pressed/released
-     * KeyboardHandler calls these continuously while keys held!
+     * Advances animation frame using delta time and action frame rate.
      */
+    private void animatePlayer(float deltaTime) {
+        animationTimer += deltaTime;
+        float frameDuration = 1f / playerAction.getFrameRate();
+
+        if (animationTimer >= frameDuration) {
+            animationIndex++;
+
+            // Death animation complete check
+            if (isDead && animationIndex >= playerAction.getFrameCount()) {
+                animationIndex = playerAction.getFrameCount() - 1;
+                isFinallyDead = true;
+            } else if (animationIndex >= playerAction.getFrameCount()) {
+                animationIndex = 0; // Loop
+            }
+
+            animationTimer = 0f;
+        }
+    }
+
+    /**
+     * Changes animation action and resets frame/timer.
+     */
+    private void changePlayerAction(PlayerAction newAction) {
+        if (playerAction == newAction) return;
+
+        playerAction = newAction;
+        animationIndex = 0;
+        animationTimer = 0f;
+    }
+
+    /**
+     * Clamps position to screen bounds.
+     */
+    private void keepInBounds() {
+        x = Math.max(0, Math.min(GAME_WIDTH - width * scale, x));
+        y = Math.max(0, Math.min(GAME_HEIGHT - height * scale, y));
+    }
+
+    // Input setters (called by KeyboardHandler)
     public void setLeft(boolean left) {
-        this.isLeft = left;
+        isLeft = left;
     }
 
     public void setRight(boolean right) {
-        this.isRight = right;
+        isRight = right;
     }
 
     public void setUp(boolean up) {
-        this.isUp = up;
+        isUp = up;
     }
 
     public void setDown(boolean down) {
-        this.isDown = down;
+        isDown = down;
     }
 
-    /**
-     * ===== UTILITY METHODS =====
-     */
-    public void stopMoving() {
-        this.isMoving = false;  // Currently unused
+    public void setDead(boolean dead) {
+        isDead = dead;
     }
 }

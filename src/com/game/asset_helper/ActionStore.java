@@ -14,20 +14,20 @@ public class ActionStore {
      */
     public enum PlayerAction {
         // 🧍 IDLE ANIMATIONS (standing still)
-        IDLE_LEFT(5, 0.5f),    // 5 frames, 0.5fps = 10 seconds per cycle (slow breathing)
-        IDLE_RIGHT(5, 0.5f),   // Mirror image of left
+        IDLE_LEFT(5, 15.5f),    // 5 frames, 0.5fps = 10 seconds per cycle (slow breathing)
+        IDLE_RIGHT(5, 15.5f),   // Mirror image of left
 
         // 🚶 WALK ANIMATIONS (normal movement)
-        WALK_LEFT(4, 0.5f),    // 4 frames, 0.5fps = 8 seconds per cycle
-        WALK_RIGHT(4, 0.5f),   // Mirror image
+        WALK_LEFT(4, 10.5f),    // 4 frames, 0.5fps = 8 seconds per cycle
+        WALK_RIGHT(4, 10.5f),   // Mirror image
 
         // ⬇️⬆️ DIRECTIONAL WALK (facing screen)
-        WALK_DOWN(8, 0.5f),    // 8 frames = More detailed front view
-        WALK_UP(8, 0.5f),      // 8 frames = Back view
+        WALK_DOWN(8, 10.5f),    // 8 frames = More detailed front view
+        WALK_UP(8, 10.5f),      // 8 frames = Back view
 
         // 💥 COMBAT ANIMATIONS
-        HURT(2, 0.3f),         // 2 frames, 0.3fps = Fast flinch (3.3s cycle)
-        DIE(10, 0.5f);         // 10 frames = Dramatic death sequence
+        HURT(2, 40.3f),         // 2 frames, 0.3fps = Fast flinch (3.3s cycle)
+        DIE(10, 15.5f);         // 10 frames = Dramatic death sequence
 
         private final int frameCount;  // How many sprites in this animation
         private final float frameRate; // Speed multiplier (frames per second)
@@ -42,7 +42,7 @@ public class ActionStore {
         }
 
         /**
-         * ===== SPRITELOADER ACCESSOR =====
+         * ===== SPRITE LOADER ACCESSOR =====
          * spriteLoader.slice(sheet, action.getFrameCount(), action.ordinal(), ...)
          * Example: IDLE_LEFT.getFrameCount() → Returns 5
          */

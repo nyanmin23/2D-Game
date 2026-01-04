@@ -4,7 +4,7 @@ public class GameConstant {
 
     // ===== GAME IDENTIFICATION =====
     public static final String GAME_TITLE = "Top Down Adventure RPG";
-    // 📝 Window title bar text → Shows in taskbar + titlebar
+    // 📝 Window title bar text → Shows in taskbar + title bar
     // Change this → Game name changes everywhere!
 
     public static final String GAME_VERSION = "1.0";

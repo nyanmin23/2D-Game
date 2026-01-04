@@ -11,4 +11,5 @@ public class Main {
 /**
  * 1. Create Project | Add Game Screens and Loops
  * 2. Add Player and Animation | User Inputs | Interaction with Player
+ * 3. Added Player Movement, Dead Animation and Logics
  */
