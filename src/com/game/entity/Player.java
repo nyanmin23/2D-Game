@@ -10,23 +10,21 @@ import static com.game.constants.GameConstant.GAME_HEIGHT;
 import static com.game.constants.GameConstant.GAME_WIDTH;
 
 /**
- * Player entity with sprite animation, movement, and death states.
- * Handles input, animation timing, and screen bounds.
+ * Player entity with sprite animation, smooth movement, and death states.
+ * Handles keyboard input, diagonal speed normalization, and bounds checking.
  */
 public class Player implements Character {
 
-    private final float width, height; // Sprite dimensions
-    private final float scale = 2.0f;  // Render scale
+    private final float width, height;
+    private final float scale = 2.0f;
     // Dependencies
     private final SpriteLoader spriteLoader;
-    private final Color color;
     // Core properties
-    private float x, y;                // World position
-    private float movementSpeed = 200f; // Pixels/second
-    // Input state
+    private float x, y;
+    private float baseSpeed = 200f;
+    // Input flags
     private boolean isLeft, isRight, isUp, isDown;
-    private boolean isMoving;
-    private boolean isFacingLeft;
+    private boolean isMoving, isFacingLeft;
     // Animation state
     private PlayerAction playerAction = PlayerAction.IDLE_RIGHT;
     private int animationIndex = 0;
@@ -35,41 +33,24 @@ public class Player implements Character {
     private boolean isDead = false;
     private boolean isFinallyDead = false;
 
-    /**
-     * Creates player at position with sprite loader.
-     */
     public Player(float x, float y, float width, float height, SpriteLoader spriteLoader) {
         this.x = x;
         this.y = y;
         this.width = width;
         this.height = height;
         this.spriteLoader = spriteLoader;
-        this.color = Color.WHITE;
-        this.animationIndex = 0;
-        this.animationTimer = 0f;
     }
 
-    /**
-     * Renders player sprite with current animation frame.
-     */
     @Override
     public void render(Graphics g) {
         if (isFinallyDead) return;
 
-        // Draw animated sprite (safely clamped index)
         BufferedImage[] frames = spriteLoader.getPlayerSprite(playerAction);
         int safeIndex = Math.max(0, Math.min(animationIndex, frames.length - 1));
-        g.drawImage(
-                frames[safeIndex],
-                (int) x, (int) y,
-                (int) (width * scale), (int) (height * scale),
-                null
-        );
+        g.drawImage(frames[safeIndex], (int) x, (int) y,
+                (int) (width * scale), (int) (height * scale), null);
     }
 
-    /**
-     * Updates movement, action state, and animation each frame.
-     */
     @Override
     public void update(float deltaTime) {
         updatePlayerAction();
@@ -78,34 +59,33 @@ public class Player implements Character {
             animatePlayer(deltaTime);
             return;
         }
+
         move(deltaTime);
         animatePlayer(deltaTime);
-
     }
 
     /**
-     * Updates movement based on input flags.
+     * Applies input-based movement with diagonal normalization.
      */
     private void move(float deltaTime) {
         isMoving = false;
+        float speed = diagonalMovement() ? (float) (baseSpeed / Math.sqrt(2)) : baseSpeed;
 
-        // Apply movement (horizontal first)
         if (isLeft && !isRight) {
-            x -= movementSpeed * deltaTime;
+            x -= speed * deltaTime;
             isFacingLeft = true;
             isMoving = true;
         } else if (isRight && !isLeft) {
-            x += movementSpeed * deltaTime;
+            x += speed * deltaTime;
             isFacingLeft = false;
             isMoving = true;
         }
 
-        // Vertical movement
         if (isUp && !isDown) {
-            y -= movementSpeed * deltaTime;
+            y -= speed * deltaTime;
             isMoving = true;
         } else if (isDown && !isUp) {
-            y += movementSpeed * deltaTime;
+            y += speed * deltaTime;
             isMoving = true;
         }
 
@@ -113,7 +93,15 @@ public class Player implements Character {
     }
 
     /**
-     * Updates current animation action based on input.
+     * Returns true if moving diagonally.
+     */
+    private boolean diagonalMovement() {
+        return (isLeft && isUp) || (isLeft && isDown) ||
+                (isRight && isUp) || (isRight && isDown);
+    }
+
+    /**
+     * Sets animation action based on input or death state.
      */
     private void updatePlayerAction() {
         if (isDead) {
@@ -121,22 +109,15 @@ public class Player implements Character {
             return;
         }
 
-        if (isDown) {
-            changePlayerAction(PlayerAction.WALK_DOWN);
-        } else if (isUp) {
-            changePlayerAction(PlayerAction.WALK_UP);
-        } else if (isLeft) {
-            changePlayerAction(PlayerAction.WALK_LEFT);
-        } else if (isRight) {
-            changePlayerAction(PlayerAction.WALK_RIGHT);
-        } else {
-            // Idle facing current direction
-            playerAction = isFacingLeft ? PlayerAction.IDLE_LEFT : PlayerAction.IDLE_RIGHT;
-        }
+        if (isDown) changePlayerAction(PlayerAction.WALK_DOWN);
+        else if (isUp) changePlayerAction(PlayerAction.WALK_UP);
+        else if (isLeft) changePlayerAction(PlayerAction.WALK_LEFT);
+        else if (isRight) changePlayerAction(PlayerAction.WALK_RIGHT);
+        else playerAction = isFacingLeft ? PlayerAction.IDLE_LEFT : PlayerAction.IDLE_RIGHT;
     }
 
     /**
-     * Advances animation frame using delta time and action frame rate.
+     * Advances animation frame using delta time.
      */
     private void animatePlayer(float deltaTime) {
         animationTimer += deltaTime;
@@ -145,12 +126,11 @@ public class Player implements Character {
         if (animationTimer >= frameDuration) {
             animationIndex++;
 
-            // Death animation complete check
             if (isDead && animationIndex >= playerAction.getFrameCount()) {
                 animationIndex = playerAction.getFrameCount() - 1;
                 isFinallyDead = true;
             } else if (animationIndex >= playerAction.getFrameCount()) {
-                animationIndex = 0; // Loop
+                animationIndex = 0;
             }
 
             animationTimer = 0f;
@@ -158,25 +138,24 @@ public class Player implements Character {
     }
 
     /**
-     * Changes animation action and resets frame/timer.
+     * Switches animation action and resets frame.
      */
     private void changePlayerAction(PlayerAction newAction) {
         if (playerAction == newAction) return;
-
         playerAction = newAction;
         animationIndex = 0;
         animationTimer = 0f;
     }
 
     /**
-     * Clamps position to screen bounds.
+     * Clamps player to screen bounds.
      */
     private void keepInBounds() {
         x = Math.max(0, Math.min(GAME_WIDTH - width * scale, x));
         y = Math.max(0, Math.min(GAME_HEIGHT - height * scale, y));
     }
 
-    // Input setters (called by KeyboardHandler)
+    // Input handlers
     public void setLeft(boolean left) {
         isLeft = left;
     }

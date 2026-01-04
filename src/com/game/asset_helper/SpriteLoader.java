@@ -7,100 +7,115 @@ import java.io.IOException;
 import java.util.EnumMap;
 import java.util.Map;
 
+import static com.game.asset_helper.ActionStore.PlayerAction;
+
+/**
+ * Loads and slices sprite sheets for player animations and map tiles.
+ * Provides access to animation frames and individual map sprites.
+ */
 public class SpriteLoader {
 
-    // ===== SPRITE SHEET CONFIGURATION =====
-    private static final String BASE_PATH = "resources/img";              // Folder containing sprites
-    private static final String PLAYER_IMG_PATH = "/player/Player";       // Player sprite sheet name
-    private static final String IMG_EXTENSION = ".png";                   // File format
+    // Paths and dimensions
+    private static final String BASE_PATH = "resources/img";
+    private static final String PLAYER_IMG_PATH = "/player/Player";
+    private static final String ENV_IMG_PATH = "/map/Env";
+    private static final String IMG_EXTENSION = ".png";
 
-    private static final int FRAME_WIDTH = 32;   // Each sprite frame = 32px wide
-    private static final int FRAME_HEIGHT = 32;  // Each sprite frame = 32px tall
+    private static final int FRAME_WIDTH = 32, FRAME_HEIGHT = 32;
+    private static final int MAP_FRAME_WIDTH = 16, MAP_FRAME_HEIGHT = 16;
 
-    // ===== MAIN DATA STORAGE - All Player Animations =====
-    // EnumMap: One array per PlayerAction (IDLE_LEFT, WALK_RIGHT, etc.)
-    public final Map<ActionStore.PlayerAction, BufferedImage[]> playerSprites =
-            new EnumMap<>(ActionStore.PlayerAction.class);
+    // Loaded sprite data
+    public final Map<PlayerAction, BufferedImage[]> playerSprites =
+            new EnumMap<>(PlayerAction.class);
+    public final BufferedImage[] map = new BufferedImage[234];
 
     /**
-     * ===== CONSTRUCTOR - Load ALL Sprites At Startup =====
-     * Runs ONCE when first Player created → Loads entire sprite sheet
-     * Populates playerSprites map with all animations
+     * Loads all player animations and map tiles from sprite sheets.
      */
     public SpriteLoader() {
-        loadPlayerSprite();  // Load everything!
+        loadPlayerSprite();
+        loadMapSprite();
     }
 
     /**
-     * ===== STEP 1: LOAD SPRITE SHEET - Single Massive Image =====
-     * <p>
-     * Loads "resources/img/player/Player.png"
-     * Sprite sheet layout:
-     * [IDLE_LEFT][WALK_LEFT][RUN_LEFT]  ← Row 0
-     * [IDLE_RIGHT][WALK_RIGHT][RUN_RIGHT] ← Row 1
-     * etc...
+     * Slices player sprite sheet into animation arrays by row.
      */
     private void loadPlayerSprite() {
-        // 📁 Load complete sprite sheet (ONE huge image)
         BufferedImage sheet = loadImage(BASE_PATH + PLAYER_IMG_PATH + IMG_EXTENSION);
 
-        // 🔪 Slice sheet into animations (one per PlayerAction)
-        for (ActionStore.PlayerAction action : ActionStore.PlayerAction.values()) {
-            // Example: IDLE_LEFT = row 0, 4 frames → slices columns 0,1,2,3 from row 0
-            playerSprites.put(action,
-                    slice(sheet, action.getFrameCount(), action.ordinal(), FRAME_WIDTH, FRAME_HEIGHT));
+        for (PlayerAction action : PlayerAction.values()) {
+            playerSprites.put(action, slice(sheet,
+                    action.getFrameCount(), action.ordinal(),
+                    FRAME_WIDTH, FRAME_HEIGHT));
         }
 
-        System.out.println("Loaded " + playerSprites.size() + " sprites");  // Debug: "Loaded 8 sprites"
+        System.out.println("Loaded " + playerSprites.size() + " player animations");
     }
 
     /**
-     * ===== UTILITY: Load Single Image File =====
-     * Converts file → BufferedImage → Ready for slicing
-     * Throws exception if file missing → Game crashes with clear error
+     * Extracts all map tiles from environment sprite sheet into flat array.
+     */
+    private void loadMapSprite() {
+        BufferedImage sheet = loadImage(BASE_PATH + ENV_IMG_PATH + IMG_EXTENSION);
+
+        int cols = sheet.getWidth() / MAP_FRAME_WIDTH;
+        int rows = sheet.getHeight() / MAP_FRAME_HEIGHT;
+
+        int index = 0;
+        for (int row = 0; row < rows && index < map.length; row++) {
+            for (int col = 0; col < cols && index < map.length; col++) {
+                map[index++] = sheet.getSubimage(
+                        col * MAP_FRAME_WIDTH,
+                        row * MAP_FRAME_HEIGHT,
+                        MAP_FRAME_WIDTH,
+                        MAP_FRAME_HEIGHT
+                );
+            }
+        }
+    }
+
+    /**
+     * Loads image file as BufferedImage.
+     *
+     * @throws RuntimeException if file missing
      */
     private BufferedImage loadImage(String path) {
         try {
-            return ImageIO.read(new File(path));  // File → Image
+            return ImageIO.read(new File(path));
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load image " + path, e);
-            // Example error: "Failed to load image resources/img/player/Player.png"
+            throw new RuntimeException("Failed to load: " + path, e);
         }
     }
 
     /**
-     * ===== STEP 2: SPRITE SHEET SLICER - Extract Animation Frames =====
-     * <p>
-     * CORE LOGIC: Sprite sheets pack animations horizontally by rows
-     * <p>
-     * EXAMPLE: slice(sheet, 4, 0, 32, 32) for IDLE_LEFT:
-     * Frame 0: getSubimage(0, 0, 32, 32)   ← Column 0, Row 0
-     * Frame 1: getSubimage(32, 0, 32, 32)  ← Column 1, Row 0
-     * Frame 2: getSubimage(64, 0, 32, 32)  ← Column 2, Row 0
-     * Frame 3: getSubimage(96, 0, 32, 32)  ← Column 3, Row 0
+     * Slices horizontal animation strip from sprite sheet row.
      */
-    private BufferedImage[] slice(BufferedImage sheet, int column, int row, int frameWidth, int frameHeight) {
-        BufferedImage[] frames = new BufferedImage[column];  // Array size = frame count
+    private BufferedImage[] slice(BufferedImage sheet, int frameCount, int row,
+                                  int frameWidth, int frameHeight) {
+        BufferedImage[] frames = new BufferedImage[frameCount];
 
-        // 🔪 Extract each frame horizontally
-        for (int i = 0; i < column; i++) {
-            // Formula: X = frameWidth * column_index, Y = row * frameHeight
-            frames[i] = sheet.getSubimage(
-                    frameWidth * i,      // X position in sheet
-                    row * frameHeight,   // Y position (which row)
-                    frameWidth,          // Width of one frame
-                    frameHeight          // Height of one frame
+        for (int col = 0; col < frameCount; col++) {
+            frames[col] = sheet.getSubimage(
+                    col * frameWidth,
+                    row * frameHeight,
+                    frameWidth,
+                    frameHeight
             );
         }
-        return frames;  // Return animation array [frame0, frame1, frame2, frame3]
+        return frames;
     }
 
     /**
-     * ===== PUBLIC ACCESSOR - Get Animation Array =====
-     * Called by Player.render(): spriteLoader.getPlayerSprite(IDLE_LEFT)
-     * Returns: BufferedImage[4] = {frame0, frame1, frame2, frame3}
+     * Returns animation frames for player action.
      */
-    public BufferedImage[] getPlayerSprite(ActionStore.PlayerAction action) {
-        return playerSprites.get(action);  // Lookup animation → Return frame array
+    public BufferedImage[] getPlayerSprite(PlayerAction action) {
+        return playerSprites.get(action);
+    }
+
+    /**
+     * Returns map tile by flat index.
+     */
+    public BufferedImage getMapSpriteByIndex(int index) {
+        return map[index];
     }
 }
